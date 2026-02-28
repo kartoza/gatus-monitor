@@ -1,0 +1,114 @@
+site_name: Gatus Monitor
+site_description: Cross-platform system tray app for monitoring Gatus endpoints
+site_author: Kartoza
+site_url: https://kartoza.github.io/gatus-monitor
+
+repo_name: kartoza/gatus-monitor
+repo_url: https://github.com/kartoza/gatus-monitor
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: green
+      accent: orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Getting Started: user-guide/getting-started.md
+      - Installation: user-guide/installation.md
+      - Configuration: user-guide/configuration.md
+      - Troubleshooting: user-guide/troubleshooting.md
+      - FAQ: user-guide/faq.md
+  - Administrator Guide:
+      - Deployment: admin-guide/deployment.md
+      - Security: admin-guide/security.md
+      - Monitoring: admin-guide/monitoring.md
+  - Developer Guide:
+      - Architecture: developer-guide/architecture.md
+      - Building: developer-guide/building.md
+      - Contributing: developer-guide/contributing.md
+      - Testing: developer-guide/testing.md
+      - Release Process: developer-guide/release-process.md
+  - API Reference:
+      - Overview: api/overview.md
+      - Packages: api/packages.md
+  - About:
+      - Funding: about/funding.md
+      - Credits: about/credits.md
+      - License: about/license.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/kartoza/gatus-monitor
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/kartoza
+    - icon: fontawesome/solid/globe
+      link: https://kartoza.com
+
+  funding:
+    - "GitHub Sponsors: https://github.com/sponsors/kartoza"
+    - "Ko-fi: https://ko-fi.com/kartoza"
+    - "Kartoza: https://kartoza.com/en/sponsorship/"
+
+copyright: >
+  Made with 💗 by <a href="https://kartoza.com" target="_blank">Kartoza</a> |
+  Copyright &copy; 2026 Kartoza

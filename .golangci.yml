@@ -1,0 +1,88 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Go vet
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis
+    - typecheck     # Type checking
+    - unused        # Check for unused constants, variables, functions and types
+    - gofmt         # Check whether code was gofmt-ed
+    - goimports     # Check import statements are formatted
+    - misspell      # Check for misspelled English words
+    - revive        # Fast, configurable, extensible, flexible linter
+    - gosec         # Security checker
+    - gocritic      # Opinionated Go source code linter
+    - gocyclo       # Cyclomatic complexity
+    - dupl          # Code clone detection
+    - prealloc      # Find slice declarations that could potentially be preallocated
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Check for unused function parameters
+    - nakedret      # Check naked returns in functions
+    - exportloopref # Check for pointers to enclosing loop variables
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    check-shadowing: true
+
+  gocyclo:
+    min-complexity: 15
+
+  dupl:
+    threshold: 100
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+
+  revive:
+    confidence: 0.8
+    rules:
+      - name: var-naming
+        disabled: false
+      - name: package-comments
+        disabled: false
+      - name: exported
+        disabled: false
+
+  nakedret:
+    max-func-lines: 30
+
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+
+    # Exclude known linters from partially hard-vendored code
+    - path: internal/icons/
+      linters:
+        - errcheck
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
