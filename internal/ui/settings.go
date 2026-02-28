@@ -25,9 +25,22 @@ type SettingsWindow struct {
 	intervalEntry   *widget.Entry
 }
 
-// NewSettingsWindow creates a new settings window
+// NewSettingsWindow creates a new settings window (creates its own Fyne app)
 func NewSettingsWindow(cfg *config.Manager, onConfigChanged func()) *SettingsWindow {
 	sw := &SettingsWindow{
+		config:          cfg,
+		onConfigChanged: onConfigChanged,
+		urls:            make([]string, len(cfg.Get().GatusURLs)),
+	}
+	copy(sw.urls, cfg.Get().GatusURLs)
+
+	return sw
+}
+
+// NewSettingsWindowWithApp creates a new settings window with an existing Fyne app
+func NewSettingsWindowWithApp(fyneApp fyne.App, cfg *config.Manager, onConfigChanged func()) *SettingsWindow {
+	sw := &SettingsWindow{
+		app:             fyneApp,
 		config:          cfg,
 		onConfigChanged: onConfigChanged,
 		urls:            make([]string, len(cfg.Get().GatusURLs)),
@@ -53,8 +66,14 @@ func (sw *SettingsWindow) ensureWindow() {
 
 // Show displays the settings window
 func (sw *SettingsWindow) Show() {
-	sw.ensureWindow()
-	sw.window.Show()
+	// Run in goroutine to avoid blocking and handle threading
+	go func() {
+		sw.ensureWindow()
+		if sw.window != nil {
+			sw.window.Show()
+			sw.window.RequestFocus()
+		}
+	}()
 }
 
 // Hide hides the settings window

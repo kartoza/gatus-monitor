@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"fyne.io/fyne/v2/app"
+
 	"github.com/kartoza/gatus-monitor/internal/config"
 	"github.com/kartoza/gatus-monitor/internal/gatus"
 	"github.com/kartoza/gatus-monitor/internal/monitor"
@@ -57,6 +59,9 @@ func newApplication() (*application, error) {
 		return nil, fmt.Errorf("failed to create config manager: %w", err)
 	}
 
+	// Create Fyne app for settings window
+	fyneApp := app.NewWithID("com.kartoza.gatus-monitor")
+
 	app := &application{
 		config: cfg,
 	}
@@ -67,8 +72,8 @@ func newApplication() (*application, error) {
 	// Create system tray
 	app.tray = systray.New(app.monitor, app.showSettings, app.quit)
 
-	// Create settings window (but don't show it yet)
-	app.settingsWindow = ui.NewSettingsWindow(cfg, app.onConfigChanged)
+	// Create settings window with shared Fyne app
+	app.settingsWindow = ui.NewSettingsWindowWithApp(fyneApp, cfg, app.onConfigChanged)
 
 	return app, nil
 }
