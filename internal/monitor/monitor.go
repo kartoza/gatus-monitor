@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/kartoza/gatus-monitor/internal/config"
 	"github.com/kartoza/gatus-monitor/internal/gatus"

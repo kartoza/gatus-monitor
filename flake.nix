@@ -30,12 +30,12 @@
 
           buildInputs = with pkgs; [
             # GUI libraries for Fyne
-            xorg.libX11
-            xorg.libXcursor
-            xorg.libXrandr
-            xorg.libXinerama
-            xorg.libXi
-            xorg.libXxf86vm
+            libx11
+            libxcursor
+            libxrandr
+            libxinerama
+            libxi
+            libxxf86vm
             libGL
 
             # System tray support
@@ -43,7 +43,7 @@
             libappindicator-gtk3
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             # Linux-specific
-            xorg.libXext
+            libxext
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             # macOS-specific
             darwin.apple_sdk.frameworks.Cocoa
@@ -71,7 +71,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Go toolchain
-            go_1_21
+            go
             gopls
             gotools
             go-tools
@@ -85,32 +85,28 @@
             pre-commit
 
             # Documentation
-            python311
-            python311Packages.mkdocs
-            python311Packages.mkdocs-material
-            python311Packages.mkdocs-mermaid2-plugin
+            python3
+            mkdocs
 
             # Build tools
             pkg-config
 
             # GUI libraries (same as buildInputs)
-            xorg.libX11
-            xorg.libXcursor
-            xorg.libXrandr
-            xorg.libXinerama
-            xorg.libXi
-            xorg.libXxf86vm
+            libx11
+            libxcursor
+            libxrandr
+            libxinerama
+            libxi
+            libxxf86vm
             libGL
             gtk3
             libappindicator-gtk3
           ] ++ lib.optionals stdenv.isLinux [
-            xorg.libXext
+            libxext
 
             # Packaging tools for Linux
             dpkg
             rpm
-            fpm
-            appimagekit
           ] ++ lib.optionals stdenv.isDarwin [
             darwin.apple_sdk.frameworks.Cocoa
             darwin.apple_sdk.frameworks.IOKit
