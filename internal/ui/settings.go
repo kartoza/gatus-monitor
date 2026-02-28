@@ -27,29 +27,41 @@ type SettingsWindow struct {
 
 // NewSettingsWindow creates a new settings window
 func NewSettingsWindow(cfg *config.Manager, onConfigChanged func()) *SettingsWindow {
-	fyneApp := app.New()
-
 	sw := &SettingsWindow{
-		app:             fyneApp,
 		config:          cfg,
 		onConfigChanged: onConfigChanged,
-		urls:            cfg.Get().GatusURLs,
+		urls:            make([]string, len(cfg.Get().GatusURLs)),
 	}
-
-	sw.window = fyneApp.NewWindow("Gatus Monitor Settings")
-	sw.buildUI()
+	copy(sw.urls, cfg.Get().GatusURLs)
 
 	return sw
 }
 
+// ensureWindow ensures the window is created (lazy initialization)
+func (sw *SettingsWindow) ensureWindow() {
+	if sw.window != nil {
+		return
+	}
+
+	if sw.app == nil {
+		sw.app = app.New()
+	}
+
+	sw.window = sw.app.NewWindow("Gatus Monitor Settings")
+	sw.buildUI()
+}
+
 // Show displays the settings window
 func (sw *SettingsWindow) Show() {
+	sw.ensureWindow()
 	sw.window.Show()
 }
 
 // Hide hides the settings window
 func (sw *SettingsWindow) Hide() {
-	sw.window.Hide()
+	if sw.window != nil {
+		sw.window.Hide()
+	}
 }
 
 // buildUI constructs the settings UI
@@ -221,6 +233,10 @@ func (sw *SettingsWindow) Reload() {
 	cfg := sw.config.Get()
 	sw.urls = make([]string, len(cfg.GatusURLs))
 	copy(sw.urls, cfg.GatusURLs)
-	sw.intervalEntry.SetText(strconv.Itoa(cfg.QueryInterval))
-	sw.urlList.Refresh()
+
+	// Only update UI elements if window has been created
+	if sw.window != nil && sw.intervalEntry != nil {
+		sw.intervalEntry.SetText(strconv.Itoa(cfg.QueryInterval))
+		sw.urlList.Refresh()
+	}
 }
