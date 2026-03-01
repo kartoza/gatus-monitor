@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package scheduler provides staggered task scheduling
 package scheduler
 
@@ -12,14 +15,14 @@ type TaskFunc func(ctx context.Context, id string) error
 
 // Task represents a scheduled task
 type Task struct {
-	ID            string
-	Offset        time.Duration
-	TaskFunc      TaskFunc
-	ticker        *time.Ticker
-	stopChan      chan struct{}
-	stoppedChan   chan struct{}
-	running       bool
-	mu            sync.Mutex
+	ID          string
+	Offset      time.Duration
+	TaskFunc    TaskFunc
+	ticker      *time.Ticker
+	stopChan    chan struct{}
+	stoppedChan chan struct{}
+	running     bool
+	mu          sync.Mutex
 }
 
 // Scheduler manages multiple tasks with staggered execution
@@ -168,13 +171,17 @@ func (t *Task) Start(ctx context.Context, interval time.Duration) {
 	}
 	t.running = true
 	offset := t.Offset
+	// Recreate channels for fresh start
+	t.stopChan = make(chan struct{})
+	t.stoppedChan = make(chan struct{})
+	stoppedChan := t.stoppedChan
 	t.mu.Unlock()
 
 	defer func() {
 		t.mu.Lock()
 		t.running = false
 		t.mu.Unlock()
-		close(t.stoppedChan)
+		close(stoppedChan)
 	}()
 
 	// Wait for offset before first execution
@@ -189,7 +196,7 @@ func (t *Task) Start(ctx context.Context, interval time.Duration) {
 	}
 
 	// Execute immediately after offset
-	t.TaskFunc(ctx, t.ID)
+	_ = t.TaskFunc(ctx, t.ID)
 
 	// Create ticker for subsequent executions
 	t.ticker = time.NewTicker(interval)
@@ -198,7 +205,7 @@ func (t *Task) Start(ctx context.Context, interval time.Duration) {
 	for {
 		select {
 		case <-t.ticker.C:
-			t.TaskFunc(ctx, t.ID)
+			_ = t.TaskFunc(ctx, t.ID)
 		case <-t.stopChan:
 			return
 		case <-ctx.Done():
@@ -214,10 +221,18 @@ func (t *Task) Stop() {
 		t.mu.Unlock()
 		return
 	}
+	stopChan := t.stopChan
+	stoppedChan := t.stoppedChan
 	t.mu.Unlock()
 
-	close(t.stopChan)
+	// Close stopChan - may already be closed if context cancelled first
+	select {
+	case <-stopChan:
+		// Already closed
+	default:
+		close(stopChan)
+	}
 
 	// Wait for task to stop
-	<-t.stoppedChan
+	<-stoppedChan
 }

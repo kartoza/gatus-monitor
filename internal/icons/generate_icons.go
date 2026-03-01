@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
+//go:build ignore
 // +build ignore
 
 // This is a helper program to generate icon files
@@ -36,7 +40,7 @@ func createIcon(filename string, col color.Color) {
 
 	// Draw a filled circle
 	center := size / 2
-	radius := size / 2 - 4
+	radius := size/2 - 4
 
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {

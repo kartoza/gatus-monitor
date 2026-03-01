@@ -13,6 +13,7 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 Before creating a bug report, please check existing issues to avoid duplicates.
 
 When creating a bug report, include:
+
 - A clear and descriptive title
 - Steps to reproduce the issue
 - Expected vs. actual behavior
@@ -22,6 +23,7 @@ When creating a bug report, include:
 ### Suggesting Enhancements
 
 Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, include:
+
 - A clear and descriptive title
 - Detailed description of the proposed feature
 - Rationale for why this enhancement would be useful
@@ -64,6 +66,7 @@ go mod download
 ```
 
 You'll also need to install system dependencies:
+
 - **Linux**: `libgl1-mesa-dev`, `xorg-dev`
 - **macOS**: Xcode Command Line Tools
 - **Windows**: MinGW-w64
@@ -106,6 +109,7 @@ This will automatically run formatters, linters, and tests before each commit.
 - Test both success and error cases
 
 Example test structure:
+
 ```go
 func TestFunction(t *testing.T) {
     tests := []struct {
@@ -146,6 +150,7 @@ Follow conventional commit format:
 ```
 
 Types:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -155,6 +160,7 @@ Types:
 - `chore`: Maintenance tasks
 
 Example:
+
 ```
 feat(monitor): add support for custom error thresholds
 
@@ -194,11 +200,12 @@ Releases are handled by maintainers:
 
 - **Questions**: Open a [GitHub Discussion](https://github.com/kartoza/gatus-monitor/discussions)
 - **Chat**: Join our community chat (link TBD)
-- **Email**: Contact maintainers at dev@kartoza.com
+- **Email**: Contact maintainers at <dev@kartoza.com>
 
 ## Recognition
 
 Contributors will be recognized in:
+
 - README.md credits section
 - Release notes
 - Documentation contributors page

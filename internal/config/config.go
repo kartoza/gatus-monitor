@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package config manages application configuration
 package config
 
@@ -21,10 +24,19 @@ const (
 	MaxQueryInterval = 3600
 )
 
+// GatusInstance represents a single Gatus monitoring instance
+type GatusInstance struct {
+	Name     string `json:"name"`      // Friendly name for this instance
+	URL      string `json:"url"`       // URL to the Gatus landing page
+	IconURL  string `json:"icon_url"`  // URL to the icon (favicon from monitored site)
+	IconData []byte `json:"icon_data"` // Cached icon data
+}
+
 // Config represents the application configuration
 type Config struct {
-	QueryInterval int      `json:"query_interval"` // Query interval in seconds
-	GatusURLs     []string `json:"gatus_urls"`     // List of Gatus base URLs
+	QueryInterval int             `json:"query_interval"` // Query interval in seconds
+	GatusURLs     []string        `json:"gatus_urls"`     // Legacy: List of Gatus base URLs (deprecated)
+	Instances     []GatusInstance `json:"instances"`      // Gatus instances with metadata
 }
 
 // Manager handles configuration persistence and validation
@@ -60,7 +72,13 @@ func DefaultConfig() *Config {
 	return &Config{
 		QueryInterval: DefaultQueryInterval,
 		GatusURLs:     []string{},
+		Instances:     []GatusInstance{},
 	}
+}
+
+// GetAPIEndpoint returns the API endpoint URL for a Gatus instance
+func (gi *GatusInstance) GetAPIEndpoint() string {
+	return gi.URL + "/api/v1/endpoints/statuses"
 }
 
 // Get returns the current configuration
@@ -99,6 +117,18 @@ func (m *Manager) Load() error {
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Migrate legacy GatusURLs to Instances
+	if len(config.GatusURLs) > 0 && len(config.Instances) == 0 {
+		for i, urlStr := range config.GatusURLs {
+			config.Instances = append(config.Instances, GatusInstance{
+				Name: fmt.Sprintf("Gatus %d", i+1),
+				URL:  urlStr,
+			})
+		}
+		// Clear legacy field after migration
+		config.GatusURLs = []string{}
 	}
 
 	// Validate loaded config
@@ -149,44 +179,51 @@ func Validate(config *Config) error {
 		return fmt.Errorf("query interval must be at most %d seconds", MaxQueryInterval)
 	}
 
-	// Validate URLs
-	for i, urlStr := range config.GatusURLs {
-		if urlStr == "" {
-			return fmt.Errorf("URL at index %d is empty", i)
+	// Validate instances
+	for i, instance := range config.Instances {
+		if instance.Name == "" {
+			return fmt.Errorf("instance at index %d must have a name", i)
 		}
 
-		parsedURL, err := url.Parse(urlStr)
+		if instance.URL == "" {
+			return fmt.Errorf("instance at index %d must have a URL", i)
+		}
+
+		parsedURL, err := url.Parse(instance.URL)
 		if err != nil {
-			return fmt.Errorf("URL at index %d is invalid: %w", i, err)
+			return fmt.Errorf("instance %q URL is invalid: %w", instance.Name, err)
 		}
 
 		// Ensure scheme is http or https
 		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-			return fmt.Errorf("URL at index %d must use http or https scheme", i)
+			return fmt.Errorf("instance %q URL must use http or https scheme", instance.Name)
 		}
 
 		// Ensure host is present
 		if parsedURL.Host == "" {
-			return fmt.Errorf("URL at index %d must have a host", i)
+			return fmt.Errorf("instance %q URL must have a host", instance.Name)
 		}
 	}
 
 	return nil
 }
 
-// AddGatusURL adds a Gatus URL to the configuration
-func (m *Manager) AddGatusURL(urlStr string) error {
-	// Check if URL already exists
-	for _, existing := range m.config.GatusURLs {
-		if existing == urlStr {
-			return fmt.Errorf("URL already exists")
+// AddInstance adds a Gatus instance to the configuration
+func (m *Manager) AddInstance(instance GatusInstance) error {
+	// Check if instance with same name or URL already exists
+	for _, existing := range m.config.Instances {
+		if existing.Name == instance.Name {
+			return fmt.Errorf("instance with name %q already exists", instance.Name)
+		}
+		if existing.URL == instance.URL {
+			return fmt.Errorf("instance with URL %q already exists", instance.URL)
 		}
 	}
 
-	// Validate URL by creating a temporary config
+	// Validate by creating a temporary config
 	tempConfig := &Config{
 		QueryInterval: m.config.QueryInterval,
-		GatusURLs:     append(m.config.GatusURLs, urlStr),
+		Instances:     append(m.config.Instances, instance),
 	}
 
 	if err := Validate(tempConfig); err != nil {
@@ -197,26 +234,52 @@ func (m *Manager) AddGatusURL(urlStr string) error {
 	return m.Update(tempConfig)
 }
 
-// RemoveGatusURL removes a Gatus URL from the configuration
-func (m *Manager) RemoveGatusURL(urlStr string) error {
-	newURLs := make([]string, 0, len(m.config.GatusURLs))
+// RemoveInstance removes a Gatus instance from the configuration
+func (m *Manager) RemoveInstance(name string) error {
+	newInstances := make([]GatusInstance, 0, len(m.config.Instances))
 	found := false
 
-	for _, existing := range m.config.GatusURLs {
-		if existing == urlStr {
+	for _, existing := range m.config.Instances {
+		if existing.Name == name {
 			found = true
 			continue
 		}
-		newURLs = append(newURLs, existing)
+		newInstances = append(newInstances, existing)
 	}
 
 	if !found {
-		return fmt.Errorf("URL not found")
+		return fmt.Errorf("instance %q not found", name)
 	}
 
 	tempConfig := &Config{
 		QueryInterval: m.config.QueryInterval,
-		GatusURLs:     newURLs,
+		Instances:     newInstances,
+	}
+
+	return m.Update(tempConfig)
+}
+
+// UpdateInstance updates an existing instance
+func (m *Manager) UpdateInstance(oldName string, newInstance GatusInstance) error {
+	newInstances := make([]GatusInstance, 0, len(m.config.Instances))
+	found := false
+
+	for _, existing := range m.config.Instances {
+		if existing.Name == oldName {
+			newInstances = append(newInstances, newInstance)
+			found = true
+		} else {
+			newInstances = append(newInstances, existing)
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("instance %q not found", oldName)
+	}
+
+	tempConfig := &Config{
+		QueryInterval: m.config.QueryInterval,
+		Instances:     newInstances,
 	}
 
 	return m.Update(tempConfig)
@@ -226,8 +289,20 @@ func (m *Manager) RemoveGatusURL(urlStr string) error {
 func (m *Manager) SetQueryInterval(seconds int) error {
 	tempConfig := &Config{
 		QueryInterval: seconds,
-		GatusURLs:     m.config.GatusURLs,
+		Instances:     m.config.Instances,
 	}
 
 	return m.Update(tempConfig)
+}
+
+// NewTestManager creates a Manager with the given config for testing purposes.
+// This should only be used in tests.
+func NewTestManager(cfg *Config) *Manager {
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
+	return &Manager{
+		storage: nil,
+		config:  cfg,
+	}
 }

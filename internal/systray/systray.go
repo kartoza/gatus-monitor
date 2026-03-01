@@ -1,34 +1,53 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package systray provides system tray integration
 package systray
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
 	"sync"
 
 	"fyne.io/systray"
 
+	"github.com/kartoza/gatus-monitor/internal/config"
 	"github.com/kartoza/gatus-monitor/internal/gatus"
 	"github.com/kartoza/gatus-monitor/internal/icons"
 	"github.com/kartoza/gatus-monitor/internal/monitor"
 )
 
+// instanceMenuItem holds menu item and associated data for an instance
+type instanceMenuItem struct {
+	menuItem *systray.MenuItem
+	url      string
+	name     string
+}
+
 // TrayApp represents the system tray application
 type TrayApp struct {
-	monitor         *monitor.Monitor
-	currentStatus   monitor.OverallStatus
-	onSettings      func()
-	onQuit          func()
-	statusMenuItem  *systray.MenuItem
-	mu              sync.RWMutex
+	monitor          *monitor.Monitor
+	config           *config.Manager
+	currentStatus    monitor.OverallStatus
+	onSettings       func()
+	onQuit           func()
+	statusMenuItem   *systray.MenuItem
+	instanceItems    []*instanceMenuItem
+	instanceStatuses map[string]*gatus.EndpointStatus
+	mu               sync.RWMutex
 }
 
 // New creates a new system tray application
-func New(mon *monitor.Monitor, onSettings, onQuit func()) *TrayApp {
+func New(mon *monitor.Monitor, cfg *config.Manager, onSettings, onQuit func()) *TrayApp {
 	return &TrayApp{
-		monitor:       mon,
-		currentStatus: monitor.StatusGreen,
-		onSettings:    onSettings,
-		onQuit:        onQuit,
+		monitor:          mon,
+		config:           cfg,
+		currentStatus:    monitor.StatusGreen,
+		onSettings:       onSettings,
+		onQuit:           onQuit,
+		instanceItems:    make([]*instanceMenuItem, 0),
+		instanceStatuses: make(map[string]*gatus.EndpointStatus),
 	}
 }
 
@@ -53,6 +72,11 @@ func (app *TrayApp) onReady() {
 	// Create menu items
 	app.statusMenuItem = systray.AddMenuItem("Status: Green", "Current overall status")
 	app.statusMenuItem.Disable()
+
+	systray.AddSeparator()
+
+	// Create instance menu items
+	app.createInstanceMenuItems()
 
 	systray.AddSeparator()
 
@@ -83,6 +107,53 @@ func (app *TrayApp) onReady() {
 	}()
 }
 
+// createInstanceMenuItems creates menu items for each configured instance
+func (app *TrayApp) createInstanceMenuItems() {
+	if app.config == nil {
+		return
+	}
+
+	instances := app.config.Get().Instances
+	for _, instance := range instances {
+		// Create menu item with gray dot initially (unknown status)
+		title := fmt.Sprintf("⚪ %s", instance.Name)
+		item := systray.AddMenuItem(title, fmt.Sprintf("Open %s in browser", instance.URL))
+
+		instanceItem := &instanceMenuItem{
+			menuItem: item,
+			url:      instance.URL,
+			name:     instance.Name,
+		}
+		app.instanceItems = append(app.instanceItems, instanceItem)
+
+		// Handle click in goroutine
+		go app.handleInstanceClick(instanceItem)
+	}
+}
+
+// handleInstanceClick handles clicks on instance menu items
+func (app *TrayApp) handleInstanceClick(item *instanceMenuItem) {
+	for range item.menuItem.ClickedCh {
+		_ = openURL(item.url)
+	}
+}
+
+// openURL opens a URL in the default browser
+func openURL(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default: // linux, freebsd, etc.
+		cmd = exec.Command("xdg-open", url)
+	}
+
+	return cmd.Start()
+}
+
 // onExit is called when the system tray exits
 func (app *TrayApp) onExit() {
 	// Cleanup if needed
@@ -92,6 +163,7 @@ func (app *TrayApp) onExit() {
 func (app *TrayApp) UpdateStatus(status monitor.OverallStatus, details map[string]*gatus.EndpointStatus) {
 	app.mu.Lock()
 	app.currentStatus = status
+	app.instanceStatuses = details
 	app.mu.Unlock()
 
 	// Update icon
@@ -106,6 +178,31 @@ func (app *TrayApp) UpdateStatus(status monitor.OverallStatus, details map[strin
 		statusText := fmt.Sprintf("Status: %s", capitalizeFirst(status.String()))
 		app.statusMenuItem.SetTitle(statusText)
 	}
+
+	// Update instance menu items with status dots
+	app.updateInstanceMenuItems(details)
+}
+
+// updateInstanceMenuItems updates the status dots for each instance
+func (app *TrayApp) updateInstanceMenuItems(details map[string]*gatus.EndpointStatus) {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+
+	for _, item := range app.instanceItems {
+		dot := "⚪" // Gray - unknown/pending
+		if status, ok := details[item.name]; ok {
+			if !status.Reachable {
+				dot = "🔴" // Red - unreachable
+			} else if status.ErrorCount >= 3 {
+				dot = "🔴" // Red - 3+ errors
+			} else if status.ErrorCount > 0 {
+				dot = "🟠" // Orange - 1-2 errors
+			} else {
+				dot = "🟢" // Green - healthy
+			}
+		}
+		item.menuItem.SetTitle(fmt.Sprintf("%s %s", dot, item.name))
+	}
 }
 
 // updateIcon updates the system tray icon
@@ -116,7 +213,13 @@ func (app *TrayApp) updateIcon(status monitor.OverallStatus) {
 
 // generateSummary generates a summary string for the tooltip
 func (app *TrayApp) generateSummary(status monitor.OverallStatus, details map[string]*gatus.EndpointStatus) string {
-	if len(details) == 0 {
+	// Get the configured endpoint count from the monitor
+	configuredCount := 0
+	if app.monitor != nil {
+		configuredCount = app.monitor.GetConfiguredEndpointCount()
+	}
+
+	if configuredCount == 0 {
 		return "Gatus Monitor - No endpoints configured"
 	}
 
@@ -136,7 +239,7 @@ func (app *TrayApp) generateSummary(status monitor.OverallStatus, details map[st
 		}
 	}
 
-	summary += fmt.Sprintf("Total Endpoints: %d\n", len(details))
+	summary += fmt.Sprintf("Total Endpoints: %d\n", configuredCount)
 	summary += fmt.Sprintf("Healthy: %d", healthy)
 
 	if unreachable > 0 {
@@ -154,7 +257,7 @@ func (app *TrayApp) generateSummary(status monitor.OverallStatus, details map[st
 func (app *TrayApp) forceRefresh() {
 	// Restart monitoring to force immediate queries
 	if app.monitor != nil {
-		app.monitor.Restart()
+		_ = app.monitor.Restart()
 	}
 }
 

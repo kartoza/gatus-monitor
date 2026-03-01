@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package monitor coordinates Gatus endpoint monitoring
 package monitor
 
@@ -73,13 +76,14 @@ func (m *Monitor) Start() error {
 	// Create scheduler with configured interval
 	m.scheduler = scheduler.New(m.config.GetQueryInterval())
 
-	// Create clients and tasks for each URL
-	for _, url := range cfg.GatusURLs {
-		client := gatus.NewClient(url)
-		m.clients[url] = client
+	// Create clients and tasks for each instance
+	for _, instance := range cfg.Instances {
+		// Use the base URL - the client will append the API path
+		client := gatus.NewClient(instance.URL)
+		m.clients[instance.Name] = client
 
-		// Add task for this URL
-		m.scheduler.AddTask(url, m.queryEndpoint)
+		// Add task for this instance
+		m.scheduler.AddTask(instance.Name, m.queryEndpoint)
 	}
 
 	// Start scheduler
@@ -114,13 +118,13 @@ func (m *Monitor) UpdateConfig(cfg *config.Config) error {
 }
 
 // queryEndpoint queries a single Gatus endpoint
-func (m *Monitor) queryEndpoint(ctx context.Context, url string) error {
+func (m *Monitor) queryEndpoint(ctx context.Context, name string) error {
 	m.mu.RLock()
-	client, exists := m.clients[url]
+	client, exists := m.clients[name]
 	m.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("client not found for URL: %s", url)
+		return fmt.Errorf("client not found for name: %s", name)
 	}
 
 	// Query the endpoint
@@ -128,7 +132,7 @@ func (m *Monitor) queryEndpoint(ctx context.Context, url string) error {
 	if err != nil {
 		// Store error status
 		m.mu.Lock()
-		m.statuses[url] = status
+		m.statuses[name] = status
 		m.mu.Unlock()
 
 		// Update overall status
@@ -138,7 +142,7 @@ func (m *Monitor) queryEndpoint(ctx context.Context, url string) error {
 
 	// Store successful status
 	m.mu.Lock()
-	m.statuses[url] = status
+	m.statuses[name] = status
 	m.mu.Unlock()
 
 	// Update overall status
@@ -175,26 +179,24 @@ func (m *Monitor) updateOverallStatus() {
 		newStatus = StatusRed
 	}
 
-	// If status changed, notify callback
-	if newStatus != m.overallStatus {
-		m.overallStatus = newStatus
-
-		// Create a copy of statuses for callback
-		statusCopy := make(map[string]*gatus.EndpointStatus)
-		for k, v := range m.statuses {
-			// Create a copy of the status
-			statusCopy[k] = &gatus.EndpointStatus{
-				URL:         v.URL,
-				ErrorCount:  v.ErrorCount,
-				LastChecked: v.LastChecked,
-				LastError:   v.LastError,
-				Reachable:   v.Reachable,
-			}
+	// Create a copy of statuses for callback
+	statusCopy := make(map[string]*gatus.EndpointStatus)
+	for k, v := range m.statuses {
+		// Create a copy of the status
+		statusCopy[k] = &gatus.EndpointStatus{
+			URL:         v.URL,
+			ErrorCount:  v.ErrorCount,
+			LastChecked: v.LastChecked,
+			LastError:   v.LastError,
+			Reachable:   v.Reachable,
 		}
-
-		// Call callback outside of lock
-		go m.notifyStatusChange(newStatus, statusCopy)
 	}
+
+	// Update current status
+	m.overallStatus = newStatus
+
+	// Always notify callback so individual endpoint statuses can be updated
+	go m.notifyStatusChange(newStatus, statusCopy)
 }
 
 // notifyStatusChange calls the status callback
@@ -235,7 +237,8 @@ func (m *Monitor) GetStatusSummary() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if len(m.statuses) == 0 {
+	configuredCount := len(m.config.Get().Instances)
+	if configuredCount == 0 {
 		return "No endpoints configured"
 	}
 
@@ -251,7 +254,7 @@ func (m *Monitor) GetStatusSummary() string {
 	}
 
 	summary := fmt.Sprintf("Overall: %s | Endpoints: %d",
-		m.overallStatus.String(), len(m.statuses))
+		m.overallStatus.String(), configuredCount)
 
 	if unreachable > 0 {
 		summary += fmt.Sprintf(" | Unreachable: %d", unreachable)
@@ -262,4 +265,9 @@ func (m *Monitor) GetStatusSummary() string {
 	}
 
 	return summary
+}
+
+// GetConfiguredEndpointCount returns the number of configured endpoints
+func (m *Monitor) GetConfiguredEndpointCount() int {
+	return len(m.config.Get().Instances)
 }

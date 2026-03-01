@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 package gatus
 
 import (
@@ -30,24 +33,23 @@ func TestGetStatus_Success(t *testing.T) {
 		assert.Equal(t, APIPath, r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Accept"))
 
-		resp := APIResponse{
-			Endpoints: []Endpoint{
-				{
-					Name:  "service-1",
-					Group: "production",
-					Results: []Result{
-						{
-							Success:   true,
-							Timestamp: time.Now(),
-							Errors:    []string{},
-						},
+		// API returns array of endpoints directly
+		endpoints := []Endpoint{
+			{
+				Name:  "service-1",
+				Group: "production",
+				Results: []Result{
+					{
+						Success:   true,
+						Timestamp: time.Now(),
+						Errors:    []string{},
 					},
 				},
 			},
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		json.NewEncoder(w).Encode(endpoints)
 	}))
 	defer server.Close()
 
@@ -64,46 +66,45 @@ func TestGetStatus_Success(t *testing.T) {
 
 func TestGetStatus_WithErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := APIResponse{
-			Endpoints: []Endpoint{
-				{
-					Name:  "service-1",
-					Group: "production",
-					Results: []Result{
-						{
-							Success:   false,
-							Timestamp: time.Now(),
-							Errors:    []string{"connection refused"},
-						},
+		// API returns array of endpoints directly
+		endpoints := []Endpoint{
+			{
+				Name:  "service-1",
+				Group: "production",
+				Results: []Result{
+					{
+						Success:   false,
+						Timestamp: time.Now(),
+						Errors:    []string{"connection refused"},
 					},
 				},
-				{
-					Name:  "service-2",
-					Group: "production",
-					Results: []Result{
-						{
-							Success:   false,
-							Timestamp: time.Now(),
-							Errors:    []string{"timeout"},
-						},
+			},
+			{
+				Name:  "service-2",
+				Group: "production",
+				Results: []Result{
+					{
+						Success:   false,
+						Timestamp: time.Now(),
+						Errors:    []string{"timeout"},
 					},
 				},
-				{
-					Name:  "service-3",
-					Group: "production",
-					Results: []Result{
-						{
-							Success:   true,
-							Timestamp: time.Now(),
-							Errors:    []string{},
-						},
+			},
+			{
+				Name:  "service-3",
+				Group: "production",
+				Results: []Result{
+					{
+						Success:   true,
+						Timestamp: time.Now(),
+						Errors:    []string{},
 					},
 				},
 			},
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		json.NewEncoder(w).Encode(endpoints)
 	}))
 	defer server.Close()
 
@@ -177,53 +178,48 @@ func TestCountErrors_NilResponse(t *testing.T) {
 }
 
 func TestCountErrors_EmptyEndpoints(t *testing.T) {
-	resp := &APIResponse{
-		Endpoints: []Endpoint{},
-	}
-	count := countErrors(resp)
+	endpoints := []Endpoint{}
+	count := countErrors(endpoints)
 	assert.Equal(t, 0, count)
 }
 
 func TestCountErrors_NoResults(t *testing.T) {
-	resp := &APIResponse{
-		Endpoints: []Endpoint{
-			{
-				Name:    "service-1",
-				Group:   "production",
-				Results: []Result{},
-			},
+	endpoints := []Endpoint{
+		{
+			Name:    "service-1",
+			Group:   "production",
+			Results: []Result{},
 		},
 	}
-	count := countErrors(resp)
+	count := countErrors(endpoints)
 	assert.Equal(t, 0, count)
 }
 
 func TestCountErrors_MixedResults(t *testing.T) {
-	resp := &APIResponse{
-		Endpoints: []Endpoint{
-			{
-				Name:  "service-1",
-				Group: "production",
-				Results: []Result{
-					{Success: false, Errors: []string{"error"}},
-				},
+	endpoints := []Endpoint{
+		{
+			Name:  "service-1",
+			Group: "production",
+			Results: []Result{
+				{Success: false, Errors: []string{"error"}},
 			},
-			{
-				Name:  "service-2",
-				Group: "production",
-				Results: []Result{
-					{Success: true, Errors: []string{}},
-				},
+		},
+		{
+			Name:  "service-2",
+			Group: "production",
+			Results: []Result{
+				{Success: true, Errors: []string{}},
 			},
-			{
-				Name:  "service-3",
-				Group: "production",
-				Results: []Result{
-					{Success: true, Errors: []string{"warning"}}, // Has errors despite success
-				},
+		},
+		{
+			Name:  "service-3",
+			Group: "production",
+			Results: []Result{
+				{Success: true, Errors: []string{"warning"}}, // Has errors despite success
 			},
 		},
 	}
-	count := countErrors(resp)
-	assert.Equal(t, 2, count) // service-1 (not success) + service-3 (has errors)
+	count := countErrors(endpoints)
+	// Only counts failures based on Success flag, not presence of errors
+	assert.Equal(t, 1, count) // Only service-1 (not success)
 }

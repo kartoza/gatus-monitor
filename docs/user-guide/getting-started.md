@@ -59,6 +59,7 @@ The tray icon color indicates the overall health status:
 ### Tooltip Information
 
 Hover over the tray icon to see detailed status information:
+
 - Overall status
 - Number of endpoints
 - Healthy, unreachable, and error counts

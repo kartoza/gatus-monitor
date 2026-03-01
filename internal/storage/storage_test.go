@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 package storage
 
 import (

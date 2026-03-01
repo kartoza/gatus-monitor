@@ -49,4 +49,4 @@ This project is open source and freely available. If you find it useful, please 
 
 ---
 
-Made with 💗 by [Kartoza](https://kartoza.com)
+Made with 💗 by [Kartoza](https://kartoza.com) | [Donate!](https://github.com/sponsors/kartoza) | [GitHub](https://github.com/kartoza/gatus-monitor)

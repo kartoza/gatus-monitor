@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Gatus Monitor - Cross-platform system tray app for monitoring Gatus endpoints
 package main
 
@@ -8,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
 	"github.com/kartoza/gatus-monitor/internal/config"
@@ -27,6 +31,7 @@ type application struct {
 	monitor        *monitor.Monitor
 	tray           *systray.TrayApp
 	settingsWindow *ui.SettingsWindow
+	fyneApp        fyne.App
 }
 
 func main() {
@@ -47,8 +52,11 @@ func main() {
 		log.Fatalf("Failed to start monitoring: %v", err)
 	}
 
-	// Run system tray (blocking)
-	app.tray.Run()
+	// Run system tray in goroutine (it blocks)
+	go app.tray.Run()
+
+	// Run Fyne app on main goroutine (required)
+	app.runFyne()
 }
 
 // newApplication creates and initializes the application
@@ -59,18 +67,19 @@ func newApplication() (*application, error) {
 		return nil, fmt.Errorf("failed to create config manager: %w", err)
 	}
 
-	// Create Fyne app for settings window
+	// Create Fyne app
 	fyneApp := app.NewWithID("com.kartoza.gatus-monitor")
 
 	app := &application{
-		config: cfg,
+		config:  cfg,
+		fyneApp: fyneApp,
 	}
 
 	// Create monitor with status callback
 	app.monitor = monitor.New(cfg, app.onStatusChange)
 
 	// Create system tray
-	app.tray = systray.New(app.monitor, app.showSettings, app.quit)
+	app.tray = systray.New(app.monitor, cfg, app.showSettings, app.quit)
 
 	// Create settings window with shared Fyne app
 	app.settingsWindow = ui.NewSettingsWindowWithApp(fyneApp, cfg, app.onConfigChanged)
@@ -122,4 +131,10 @@ func (app *application) handleShutdown() {
 
 	log.Println("Received shutdown signal")
 	app.quit()
+}
+
+// runFyne starts the Fyne event loop on the main goroutine
+func (app *application) runFyne() {
+	// Run without showing a window - we're headless with systray only
+	app.fyneApp.Run()
 }

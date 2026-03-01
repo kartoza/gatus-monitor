@@ -1,25 +1,35 @@
 repos:
-  # Go formatting
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  # Go formatting and linting (using local hooks for better compatibility)
+  - repo: local
     hooks:
       - id: go-fmt
         name: Format Go code
-        description: Run go fmt on all Go files
+        entry: go fmt ./...
+        language: system
+        pass_filenames: false
+        types: [go]
       - id: go-vet
         name: Run go vet
-        description: Run go vet on all Go files
+        entry: go vet ./...
+        language: system
+        pass_filenames: false
+        types: [go]
       - id: go-mod-tidy
         name: Tidy Go modules
-        description: Run go mod tidy
+        entry: bash -c 'go mod tidy && git diff --exit-code go.mod go.sum'
+        language: system
+        pass_filenames: false
+        types: [go]
 
-  # Golangci-lint
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
+  # Golangci-lint (using system-installed version for Go 1.25+ compatibility)
+  - repo: local
     hooks:
       - id: golangci-lint
         name: Run golangci-lint
-        description: Run golangci-lint on all Go files
+        entry: golangci-lint run
+        language: system
+        pass_filenames: false
+        types: [go]
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -34,6 +44,7 @@ repos:
         name: Check for merge conflicts
       - id: check-yaml
         name: Check YAML syntax
+        exclude: mkdocs.yml  # mkdocs.yml uses Python-specific YAML tags
       - id: check-json
         name: Check JSON syntax
       - id: check-toml

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package storage provides persistent file storage with platform-specific paths
 package storage
 
@@ -68,7 +71,7 @@ func (s *Storage) WriteConfig(data []byte) error {
 
 	// Atomic rename
 	if err := os.Rename(tmpFile, s.configFile); err != nil {
-		os.Remove(tmpFile) // Clean up temp file
+		_ = os.Remove(tmpFile) // Clean up temp file
 		return fmt.Errorf("failed to rename config file: %w", err)
 	}
 

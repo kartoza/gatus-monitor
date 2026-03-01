@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 package scheduler
 
 import (
@@ -21,9 +24,7 @@ func TestNew(t *testing.T) {
 func TestAddTask(t *testing.T) {
 	scheduler := New(60 * time.Second)
 
-	taskCalled := false
 	taskFunc := func(ctx context.Context, id string) error {
-		taskCalled = true
 		return nil
 	}
 

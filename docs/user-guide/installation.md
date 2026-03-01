@@ -107,6 +107,7 @@ gatus-monitor --version
 ```
 
 You should see output similar to:
+
 ```
 Gatus Monitor v0.1.0
 ```

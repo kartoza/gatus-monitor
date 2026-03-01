@@ -25,18 +25,21 @@ A cross-platform system tray application for monitoring [Gatus](https://github.c
 ### Linux
 
 #### Debian/Ubuntu (.deb)
+
 ```bash
 wget https://github.com/kartoza/gatus-monitor/releases/latest/download/gatus-monitor_linux_amd64.deb
 sudo dpkg -i gatus-monitor_linux_amd64.deb
 ```
 
 #### Red Hat/Fedora (.rpm)
+
 ```bash
 wget https://github.com/kartoza/gatus-monitor/releases/latest/download/gatus-monitor_linux_amd64.rpm
 sudo rpm -i gatus-monitor_linux_amd64.rpm
 ```
 
 #### AppImage
+
 ```bash
 wget https://github.com/kartoza/gatus-monitor/releases/latest/download/gatus-monitor_linux_amd64.AppImage
 chmod +x gatus-monitor_linux_amd64.AppImage
@@ -46,11 +49,13 @@ chmod +x gatus-monitor_linux_amd64.AppImage
 ### macOS
 
 #### Direct Download
+
 Download the `.dmg` file from the [releases page](https://github.com/kartoza/gatus-monitor/releases) and drag to Applications.
 
 ### Windows
 
 #### MSI Installer
+
 Download and run the `.msi` installer from the [releases page](https://github.com/kartoza/gatus-monitor/releases).
 
 ### From Source
@@ -79,6 +84,7 @@ Configuration is stored in a platform-specific location:
 - **Windows**: `%APPDATA%\gatus-monitor\config.json`
 
 Example configuration:
+
 ```json
 {
   "query_interval": 60,
@@ -159,9 +165,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## Support
 
-- **Documentation**: https://kartoza.github.io/gatus-monitor
-- **Issue Tracker**: https://github.com/kartoza/gatus-monitor/issues
-- **Discussions**: https://github.com/kartoza/gatus-monitor/discussions
+- **Documentation**: <https://kartoza.github.io/gatus-monitor>
+- **Issue Tracker**: <https://github.com/kartoza/gatus-monitor/issues>
+- **Discussions**: <https://github.com/kartoza/gatus-monitor/discussions>
 
 ## Funding
 
@@ -177,7 +183,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Credits
 
-Made with 💗 by [Kartoza](https://kartoza.com)
+Made with 💗 by [Kartoza](https://kartoza.com) | [Donate!](https://github.com/sponsors/kartoza) | [GitHub](https://github.com/kartoza/gatus-monitor)
 
 ### Built With
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package icons provides embedded icon resources for different status states
 package icons
 
@@ -5,15 +8,18 @@ import (
 	_ "embed"
 )
 
-// Icon byte slices for different status states
-// These are simple PNG icons that work across all platforms
-
+// GreenIcon is the icon for healthy status (all endpoints OK)
+//
 //go:embed green.png
 var GreenIcon []byte
 
+// OrangeIcon is the icon for warning status (1-2 errors)
+//
 //go:embed orange.png
 var OrangeIcon []byte
 
+// RedIcon is the icon for error status (3+ errors or unreachable)
+//
 //go:embed red.png
 var RedIcon []byte
 

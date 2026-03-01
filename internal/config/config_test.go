@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 package config
 
 import (
@@ -5,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -17,9 +19,9 @@ func TestDefaultConfig(t *testing.T) {
 func TestValidate_ValidConfig(t *testing.T) {
 	config := &Config{
 		QueryInterval: 60,
-		GatusURLs: []string{
-			"https://status.example.com",
-			"http://localhost:8080",
+		Instances: []GatusInstance{
+			{Name: "Production", URL: "https://status.example.com"},
+			{Name: "Staging", URL: "http://localhost:8080"},
 		},
 	}
 
@@ -36,7 +38,7 @@ func TestValidate_NilConfig(t *testing.T) {
 func TestValidate_IntervalTooLow(t *testing.T) {
 	config := &Config{
 		QueryInterval: 5,
-		GatusURLs:     []string{},
+		Instances:     []GatusInstance{},
 	}
 
 	err := Validate(config)
@@ -47,7 +49,7 @@ func TestValidate_IntervalTooLow(t *testing.T) {
 func TestValidate_IntervalTooHigh(t *testing.T) {
 	config := &Config{
 		QueryInterval: 5000,
-		GatusURLs:     []string{},
+		Instances:     []GatusInstance{},
 	}
 
 	err := Validate(config)
@@ -58,18 +60,29 @@ func TestValidate_IntervalTooHigh(t *testing.T) {
 func TestValidate_EmptyURL(t *testing.T) {
 	config := &Config{
 		QueryInterval: 60,
-		GatusURLs:     []string{""},
+		Instances:     []GatusInstance{{Name: "Test", URL: ""}},
 	}
 
 	err := Validate(config)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "empty")
+	assert.Contains(t, err.Error(), "URL")
+}
+
+func TestValidate_EmptyName(t *testing.T) {
+	config := &Config{
+		QueryInterval: 60,
+		Instances:     []GatusInstance{{Name: "", URL: "https://example.com"}},
+	}
+
+	err := Validate(config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "name")
 }
 
 func TestValidate_InvalidURL(t *testing.T) {
 	config := &Config{
 		QueryInterval: 60,
-		GatusURLs:     []string{"not-a-valid-url"},
+		Instances:     []GatusInstance{{Name: "Test", URL: "://invalid"}},
 	}
 
 	err := Validate(config)
@@ -79,7 +92,7 @@ func TestValidate_InvalidURL(t *testing.T) {
 func TestValidate_InvalidScheme(t *testing.T) {
 	config := &Config{
 		QueryInterval: 60,
-		GatusURLs:     []string{"ftp://example.com"},
+		Instances:     []GatusInstance{{Name: "Test", URL: "ftp://example.com"}},
 	}
 
 	err := Validate(config)
@@ -90,7 +103,7 @@ func TestValidate_InvalidScheme(t *testing.T) {
 func TestValidate_MissingHost(t *testing.T) {
 	config := &Config{
 		QueryInterval: 60,
-		GatusURLs:     []string{"https://"},
+		Instances:     []GatusInstance{{Name: "Test", URL: "https://"}},
 	}
 
 	err := Validate(config)
@@ -109,43 +122,41 @@ func TestManager_GetQueryInterval(t *testing.T) {
 	assert.Equal(t, 120*time.Second, duration)
 }
 
-func TestManager_AddGatusURL(t *testing.T) {
+func TestManager_AddInstance(t *testing.T) {
 	// This test would need proper storage setup
 	// For now, we'll test the logic without persistence
 	manager := &Manager{
 		config: &Config{
 			QueryInterval: 60,
-			GatusURLs:     []string{},
+			Instances:     []GatusInstance{},
 		},
 	}
 
-	// Mock the Update method behavior
-	testURL := "https://status.example.com"
-
 	// Manually test the validation logic
+	instance := GatusInstance{Name: "Production", URL: "https://status.example.com"}
 	tempConfig := &Config{
 		QueryInterval: manager.config.QueryInterval,
-		GatusURLs:     append(manager.config.GatusURLs, testURL),
+		Instances:     append(manager.config.Instances, instance),
 	}
 
 	err := Validate(tempConfig)
 	assert.NoError(t, err)
 }
 
-func TestManager_AddGatusURL_Duplicate(t *testing.T) {
+func TestManager_AddInstance_DuplicateURL(t *testing.T) {
 	manager := &Manager{
 		config: &Config{
 			QueryInterval: 60,
-			GatusURLs:     []string{"https://status.example.com"},
+			Instances:     []GatusInstance{{Name: "Existing", URL: "https://status.example.com"}},
 		},
 	}
 
 	// Test duplicate detection logic
 	testURL := "https://status.example.com"
-	for _, existing := range manager.config.GatusURLs {
-		if existing == testURL {
+	for _, existing := range manager.config.Instances {
+		if existing.URL == testURL {
 			// This should trigger
-			assert.Equal(t, testURL, existing)
+			assert.Equal(t, testURL, existing.URL)
 			return
 		}
 	}
@@ -153,47 +164,47 @@ func TestManager_AddGatusURL_Duplicate(t *testing.T) {
 	t.Fatal("Expected to find duplicate URL")
 }
 
-func TestManager_RemoveGatusURL(t *testing.T) {
+func TestManager_RemoveInstance(t *testing.T) {
 	manager := &Manager{
 		config: &Config{
 			QueryInterval: 60,
-			GatusURLs: []string{
-				"https://status1.example.com",
-				"https://status2.example.com",
+			Instances: []GatusInstance{
+				{Name: "Production", URL: "https://status1.example.com"},
+				{Name: "Staging", URL: "https://status2.example.com"},
 			},
 		},
 	}
 
 	// Test removal logic
-	urlToRemove := "https://status1.example.com"
-	newURLs := make([]string, 0, len(manager.config.GatusURLs))
+	nameToRemove := "Production"
+	newInstances := make([]GatusInstance, 0, len(manager.config.Instances))
 	found := false
 
-	for _, existing := range manager.config.GatusURLs {
-		if existing == urlToRemove {
+	for _, existing := range manager.config.Instances {
+		if existing.Name == nameToRemove {
 			found = true
 			continue
 		}
-		newURLs = append(newURLs, existing)
+		newInstances = append(newInstances, existing)
 	}
 
 	assert.True(t, found)
-	assert.Len(t, newURLs, 1)
-	assert.Equal(t, "https://status2.example.com", newURLs[0])
+	assert.Len(t, newInstances, 1)
+	assert.Equal(t, "Staging", newInstances[0].Name)
 }
 
 func TestManager_SetQueryInterval(t *testing.T) {
 	manager := &Manager{
 		config: &Config{
 			QueryInterval: 60,
-			GatusURLs:     []string{},
+			Instances:     []GatusInstance{},
 		},
 	}
 
 	// Test interval validation
 	tempConfig := &Config{
 		QueryInterval: 120,
-		GatusURLs:     manager.config.GatusURLs,
+		Instances:     manager.config.Instances,
 	}
 
 	err := Validate(tempConfig)
@@ -204,14 +215,14 @@ func TestManager_SetQueryInterval_Invalid(t *testing.T) {
 	manager := &Manager{
 		config: &Config{
 			QueryInterval: 60,
-			GatusURLs:     []string{},
+			Instances:     []GatusInstance{},
 		},
 	}
 
 	// Test invalid interval
 	tempConfig := &Config{
 		QueryInterval: 5, // Too low
-		GatusURLs:     manager.config.GatusURLs,
+		Instances:     manager.config.Instances,
 	}
 
 	err := Validate(tempConfig)

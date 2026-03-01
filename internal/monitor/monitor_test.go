@@ -1,6 +1,10 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 package monitor
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -9,6 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mockConfigManager creates a mock config manager for testing
+func mockConfigManager() *config.Manager {
+	return config.NewTestManager(nil)
+}
 
 func TestOverallStatus_String(t *testing.T) {
 	tests := []struct {
@@ -28,7 +37,7 @@ func TestOverallStatus_String(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 	callback := func(status OverallStatus, details map[string]*gatus.EndpointStatus) {}
 
 	monitor := New(cfg, callback)
@@ -40,7 +49,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestGetOverallStatus(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 	monitor := New(cfg, nil)
 
 	status := monitor.GetOverallStatus()
@@ -48,7 +57,7 @@ func TestGetOverallStatus(t *testing.T) {
 }
 
 func TestGetEndpointStatuses(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 	monitor := New(cfg, nil)
 
 	// Add some test statuses
@@ -65,14 +74,17 @@ func TestGetEndpointStatuses(t *testing.T) {
 }
 
 func TestUpdateOverallStatus_Green(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 
-	statusChanged := false
+	var mu sync.Mutex
+	callbackCalled := false
 	var receivedStatus OverallStatus
 
 	callback := func(status OverallStatus, details map[string]*gatus.EndpointStatus) {
-		statusChanged = true
+		mu.Lock()
+		callbackCalled = true
 		receivedStatus = status
+		mu.Unlock()
 	}
 
 	monitor := New(cfg, callback)
@@ -95,18 +107,24 @@ func TestUpdateOverallStatus_Green(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, StatusGreen, monitor.GetOverallStatus())
-	assert.False(t, statusChanged) // Status didn't change from initial green
+	mu.Lock()
+	assert.True(t, callbackCalled) // Callback is always called to update endpoint details
+	assert.Equal(t, StatusGreen, receivedStatus)
+	mu.Unlock()
 }
 
 func TestUpdateOverallStatus_Orange(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 
+	var mu sync.Mutex
 	statusChanged := false
 	var receivedStatus OverallStatus
 
 	callback := func(status OverallStatus, details map[string]*gatus.EndpointStatus) {
+		mu.Lock()
 		statusChanged = true
 		receivedStatus = status
+		mu.Unlock()
 	}
 
 	monitor := New(cfg, callback)
@@ -129,19 +147,24 @@ func TestUpdateOverallStatus_Orange(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, StatusOrange, monitor.GetOverallStatus())
+	mu.Lock()
 	assert.True(t, statusChanged)
 	assert.Equal(t, StatusOrange, receivedStatus)
+	mu.Unlock()
 }
 
 func TestUpdateOverallStatus_Red(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 
+	var mu sync.Mutex
 	statusChanged := false
 	var receivedStatus OverallStatus
 
 	callback := func(status OverallStatus, details map[string]*gatus.EndpointStatus) {
+		mu.Lock()
 		statusChanged = true
 		receivedStatus = status
+		mu.Unlock()
 	}
 
 	monitor := New(cfg, callback)
@@ -159,19 +182,24 @@ func TestUpdateOverallStatus_Red(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, StatusRed, monitor.GetOverallStatus())
+	mu.Lock()
 	assert.True(t, statusChanged)
 	assert.Equal(t, StatusRed, receivedStatus)
+	mu.Unlock()
 }
 
 func TestUpdateOverallStatus_Unreachable(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 
+	var mu sync.Mutex
 	statusChanged := false
 	var receivedStatus OverallStatus
 
 	callback := func(status OverallStatus, details map[string]*gatus.EndpointStatus) {
+		mu.Lock()
 		statusChanged = true
 		receivedStatus = status
+		mu.Unlock()
 	}
 
 	monitor := New(cfg, callback)
@@ -189,23 +217,31 @@ func TestUpdateOverallStatus_Unreachable(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, StatusRed, monitor.GetOverallStatus())
+	mu.Lock()
 	assert.True(t, statusChanged)
 	assert.Equal(t, StatusRed, receivedStatus)
+	mu.Unlock()
 }
 
 func TestGetStatusSummary(t *testing.T) {
 	tests := []struct {
-		name     string
-		statuses map[string]*gatus.EndpointStatus
-		contains []string
+		name      string
+		instances []config.GatusInstance
+		statuses  map[string]*gatus.EndpointStatus
+		contains  []string
 	}{
 		{
-			name:     "no endpoints",
-			statuses: map[string]*gatus.EndpointStatus{},
-			contains: []string{"No endpoints configured"},
+			name:      "no endpoints",
+			instances: []config.GatusInstance{},
+			statuses:  map[string]*gatus.EndpointStatus{},
+			contains:  []string{"No endpoints configured"},
 		},
 		{
 			name: "all green",
+			instances: []config.GatusInstance{
+				{Name: "Instance 1", URL: "https://url1.example.com"},
+				{Name: "Instance 2", URL: "https://url2.example.com"},
+			},
 			statuses: map[string]*gatus.EndpointStatus{
 				"url1": {URL: "url1", ErrorCount: 0, Reachable: true},
 				"url2": {URL: "url2", ErrorCount: 0, Reachable: true},
@@ -214,6 +250,9 @@ func TestGetStatusSummary(t *testing.T) {
 		},
 		{
 			name: "with errors",
+			instances: []config.GatusInstance{
+				{Name: "Instance 1", URL: "https://url1.example.com"},
+			},
 			statuses: map[string]*gatus.EndpointStatus{
 				"url1": {URL: "url1", ErrorCount: 2, Reachable: true},
 			},
@@ -221,6 +260,9 @@ func TestGetStatusSummary(t *testing.T) {
 		},
 		{
 			name: "with unreachable",
+			instances: []config.GatusInstance{
+				{Name: "Instance 1", URL: "https://url1.example.com"},
+			},
 			statuses: map[string]*gatus.EndpointStatus{
 				"url1": {URL: "url1", ErrorCount: 0, Reachable: false},
 			},
@@ -230,7 +272,10 @@ func TestGetStatusSummary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Manager{}
+			cfg := config.NewTestManager(&config.Config{
+				QueryInterval: 60,
+				Instances:     tt.instances,
+			})
 			monitor := New(cfg, nil)
 			monitor.statuses = tt.statuses
 
@@ -247,7 +292,7 @@ func TestGetStatusSummary(t *testing.T) {
 }
 
 func TestUpdateOverallStatus_NoCallback(t *testing.T) {
-	cfg := &config.Manager{}
+	cfg := mockConfigManager()
 	monitor := New(cfg, nil) // No callback
 
 	monitor.statuses["url1"] = &gatus.EndpointStatus{
@@ -297,7 +342,7 @@ func TestStatusChangePriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Manager{}
+			cfg := mockConfigManager()
 			monitor := New(cfg, nil)
 			monitor.statuses = tt.statuses
 

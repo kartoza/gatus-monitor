@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kartoza
+// SPDX-License-Identifier: MIT
+
 // Package gatus provides a client for the Gatus API
 package gatus
 
@@ -69,21 +72,22 @@ func (c *Client) GetStatus(ctx context.Context) (*EndpointStatus, error) {
 		status.LastError = fmt.Errorf("failed to make request: %w", err)
 		return status, status.LastError
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		status.LastError = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 		return status, status.LastError
 	}
 
-	var apiResp APIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+	// The API returns an array of endpoints directly, not wrapped in an object
+	var endpoints []Endpoint
+	if err := json.NewDecoder(resp.Body).Decode(&endpoints); err != nil {
 		status.LastError = fmt.Errorf("failed to decode response: %w", err)
 		return status, status.LastError
 	}
 
 	// Count errors in the response
-	errorCount := countErrors(&apiResp)
+	errorCount := countErrors(endpoints)
 	status.ErrorCount = errorCount
 	status.Reachable = true
 	status.LastError = nil
@@ -92,33 +96,28 @@ func (c *Client) GetStatus(ctx context.Context) (*EndpointStatus, error) {
 }
 
 // countErrors counts the number of failed endpoints in the API response
-func countErrors(resp *APIResponse) int {
-	if resp == nil {
+func countErrors(endpoints []Endpoint) int {
+	if endpoints == nil {
 		return 0
 	}
 
 	errorCount := 0
-	for _, endpoint := range resp.Endpoints {
+	for _, endpoint := range endpoints {
 		// Check if endpoint has any results
 		if len(endpoint.Results) == 0 {
 			continue
 		}
 
-		// Check the most recent result
+		// Check the most recent result (results are ordered most recent first)
 		latestResult := endpoint.Results[0]
 
-		// Count as error if not successful or has errors
-		if !latestResult.Success || len(latestResult.Errors) > 0 {
+		// Count as error if not successful
+		if !latestResult.Success {
 			errorCount++
 		}
 	}
 
 	return errorCount
-}
-
-// APIResponse represents the response from the Gatus API
-type APIResponse struct {
-	Endpoints []Endpoint `json:"endpoints"`
 }
 
 // Endpoint represents a monitored endpoint in Gatus
